@@ -15,14 +15,17 @@ public class Rigid_Bunny : MonoBehaviour
 	float angular_decay	= 0.98f;				
 	float restitution 	= 0.5f;					// for collision
 
+	Mesh mesh = null;
+	Vector3[] vertices = null;
+
 
 	// Use this for initialization
 	void Start () 
 	{		
-		Mesh mesh = GetComponent<MeshFilter>().mesh;
-		Vector3[] vertices = mesh.vertices;
+		mesh = GetComponent<MeshFilter>().mesh;
+		vertices = mesh.vertices;
 
-		float m = 0.0001f;
+		float m = 1.0f / vertices.Length;
 		mass=0;
 		for (int i=0; i<vertices.Length; i++) 
 		{
@@ -65,6 +68,58 @@ public class Rigid_Bunny : MonoBehaviour
 	//a plane <P, N>
 	void Collision_Impulse(Vector3 P, Vector3 N)
 	{
+		Vector3 collisionVertex = Vector3.zero;
+		int collisionCount = 0;
+
+		foreach (Vector3 vet in vertices) {
+			Vector4 h = new Vector4(vet.x, vet.y, vet.z, 1);
+			Matrix4x4 model = transform.localToWorldMatrix;
+			Vector3 wv = model * h;
+
+			float SDF = Vector3.Dot(wv - P, N.normalized);
+			if (SDF < 0) {
+				collisionVertex += v;
+				++collisionCount;
+			}
+		}
+
+		if (collisionCount > 0) {
+			collisionVertex /= collisionCount;
+			Vector4 h = new Vector4(collisionVertex.x, collisionVertex.y, collisionVertex.z, 1);
+			Matrix4x4 R = GetRotationMatrix(transform.rotation);
+			Vector3 rad = R * h;
+			Vector3 velocity = v + Vector3.Cross(w, rad);
+
+			if (Vector3.Dot(velocity, N.normalized) >= 0) {
+				return;
+			}
+
+			Vector3 vn = Vector3.Dot(velocity, N.normalized) * N.normalized;
+			Vector3 vt = v - vn;
+
+			Vector3 nextVN = -restitution * vn;
+			float alpha = Mathf.Max(1 - 0.1f * (1 + restitution) * vn.magnitude / vt.magnitude, 0);
+			Vector3 nextVT = alpha * vt;
+			Vector3 nextV = nextVN + nextVT;
+
+			Matrix4x4 I = R * I_ref * R.transpose;
+			Matrix4x4 K = Matrix4x4.identity;
+			K[0, 0] /= mass; K[1, 1] /= mass; K[2, 2] /= mass;
+			Matrix4x4 temp = Get_Cross_Matrix(rad) * I.inverse * Get_Cross_Matrix(rad);
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					K[i, j] -= temp[i, j];
+				}
+			}
+
+			Vector4 deltaV = nextV - v;
+			deltaV.w = 0;
+			Vector3 J = K.inverse * deltaV;
+
+			v += (1.0f / mass) * J;
+			Vector4 deltaW = I.inverse * Vector3.Cross(rad, J);
+			w += new Vector3(deltaW.x, deltaW.y, deltaW.z);
+		}
 	}
 
 	Matrix4x4 GetRotationMatrix(Quaternion q) {
@@ -86,13 +141,13 @@ public class Rigid_Bunny : MonoBehaviour
 	void Update () 
 	{
 		//Game Control
-		if(Input.GetKey("r"))
+		if(launched && Input.GetKey("r"))
 		{
 			transform.position = new Vector3 (0, 0.6f, 0);
 			restitution = 0.5f;
 			launched=false;
 		}
-		if(Input.GetKey("l"))
+		if(!launched && Input.GetKey("l"))
 		{
 			v = new Vector3 (5, 2, 0);
 			launched=true;
@@ -106,17 +161,10 @@ public class Rigid_Bunny : MonoBehaviour
 		Vector3 force = new Vector3(0, -9.8f, 0);
 		v = v + dt * force / mass;
 		v *= linear_decay;
+		w *= angular_decay;
 
 		// w = new Vector3(0, 100, 0); // for test
 		// No need for tau update since the unique force is gravity.
-
-		// Matrix4x4 R = GetRotationMatrix(transform.rotation);
-		// Matrix4x4 I = R * I_ref * R.transpose;
-		// for (int i = 0; i < 3; ++i) {
-		// 	for (int j = 0; j < 3; ++j) {
-		// 		//I[i, j] 
-		// 	}
-		// }
 
 		// Part II: Collision Impulse
 		Collision_Impulse(new Vector3(0, 0.01f, 0), new Vector3(0, 1, 0));
