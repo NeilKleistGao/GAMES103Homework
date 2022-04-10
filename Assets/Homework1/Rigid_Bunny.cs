@@ -22,7 +22,7 @@ public class Rigid_Bunny : MonoBehaviour
 		Mesh mesh = GetComponent<MeshFilter>().mesh;
 		Vector3[] vertices = mesh.vertices;
 
-		float m=1;
+		float m = 0.0001f;
 		mass=0;
 		for (int i=0; i<vertices.Length; i++) 
 		{
@@ -67,6 +67,21 @@ public class Rigid_Bunny : MonoBehaviour
 	{
 	}
 
+	Matrix4x4 GetRotationMatrix(Quaternion q) {
+		Matrix4x4 R = Matrix4x4.identity;
+		R[0, 0] = q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z;
+		R[0, 1] = 2 * (q.x * q.y - q.w * q.z);
+		R[0, 2] = 2 * (q.x * q.z + q.w * q.y);
+		R[1, 1] = q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z;
+		R[1, 0] = 2 * (q.x * q.y + q.w * q.z);
+		R[1, 2] = 2 * (q.y * q.z - q.w * q.x);
+		R[2, 2] = q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z;
+		R[2, 0] = 2 * (q.x * q.z - q.w * q.y);
+		R[2, 1] = 2 * (q.y * q.z + q.w * q.x);
+
+		return R;
+	}
+
 	// Update is called once per frame
 	void Update () 
 	{
@@ -83,8 +98,25 @@ public class Rigid_Bunny : MonoBehaviour
 			launched=true;
 		}
 
-		// Part I: Update velocities
+		if (!launched) {
+			return;
+		}
 
+		// Part I: Update velocities
+		Vector3 force = new Vector3(0, -9.8f, 0);
+		v = v + dt * force / mass;
+		v *= linear_decay;
+
+		// w = new Vector3(0, 100, 0); // for test
+		// No need for tau update since the unique force is gravity.
+
+		// Matrix4x4 R = GetRotationMatrix(transform.rotation);
+		// Matrix4x4 I = R * I_ref * R.transpose;
+		// for (int i = 0; i < 3; ++i) {
+		// 	for (int j = 0; j < 3; ++j) {
+		// 		//I[i, j] 
+		// 	}
+		// }
 
 		// Part II: Collision Impulse
 		Collision_Impulse(new Vector3(0, 0.01f, 0), new Vector3(0, 1, 0));
@@ -93,8 +125,17 @@ public class Rigid_Bunny : MonoBehaviour
 		// Part III: Update position & orientation
 		//Update linear status
 		Vector3 x    = transform.position;
+		x = x + dt * v;
+
 		//Update angular status
 		Quaternion q = transform.rotation;
+		Quaternion deltaQ = new Quaternion();
+		deltaQ.w = 0;
+		deltaQ.x = dt * 0.5f * w.x;
+		deltaQ.y = dt * 0.5f * w.y;
+		deltaQ.z = dt * 0.5f * w.z;
+		deltaQ = deltaQ * q;
+		q.x += deltaQ.x; q.y += deltaQ.y; q.z += deltaQ.z; q.w += deltaQ.w;
 
 		// Part IV: Assign to the object
 		transform.position = x;
