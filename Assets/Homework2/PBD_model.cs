@@ -132,7 +132,35 @@ public class PBD_model: MonoBehaviour {
 		Vector3[] vertices = mesh.vertices;
 
 		//Apply PBD here.
-		//...
+		Vector3[] positions = new Vector3[vertices.Length];
+		int[] sum = new int[vertices.Length];
+		for (int i = 0; i < vertices.Length; ++i) {
+			positions[i] = Vector3.zero;
+			sum[i] = 0;
+		}
+
+		float alpha = 0.2f;
+
+		for (int i = 0; i < E.Length / 2; ++i) {
+			int v1 = E[i * 2], v2 = E[i * 2 + 1];
+			if (v1 != 0 && v1 != 20) {
+				positions[v1] += vertices[v1] + 0.5f * (Vector3.Distance(vertices[v1], vertices[v2]) - L[i]) * (vertices[v2] - vertices[v1]).normalized;
+			}
+			
+			if (v2 != 0 && v2 != 20) {
+				positions[v2] += vertices[v2] + 0.5f * (Vector3.Distance(vertices[v2], vertices[v1]) - L[i]) * (vertices[v1] - vertices[v2]).normalized;
+			}
+			
+			++sum[v1]; ++sum[v2];
+		}
+
+		for (int i = 0; i < vertices.Length; ++i) {
+			if(i==0 || i==20)	continue;
+			Vector3 res = (positions[i] + alpha * vertices[i]) / (sum[i] + alpha);
+			V[i] += (res - vertices[i]) / t;
+			vertices[i] = res;
+		}
+
 		mesh.vertices = vertices;
 	}
 
@@ -141,8 +169,19 @@ public class PBD_model: MonoBehaviour {
 		Mesh mesh = GetComponent<MeshFilter> ().mesh;
 		Vector3[] X = mesh.vertices;
 		
+		GameObject sphere = GameObject.Find("Sphere");
+		Vector3 center = sphere.transform.position;
+		float radius = 2.7f;
+
 		//For every vertex, detect collision and apply impulse if needed.
-		//...
+		for (int i = 0; i < X.Length; ++i) {
+			if (Vector3.Distance(center, X[i]) < radius) {
+				Vector3 res = center + radius * (X[i] - center).normalized;
+				V[i] += (res - X[i]) / t;
+				X[i] = res;
+			}
+		}
+
 		mesh.vertices = X;
 	}
 
@@ -152,23 +191,24 @@ public class PBD_model: MonoBehaviour {
 		Mesh mesh = GetComponent<MeshFilter> ().mesh;
 		Vector3[] X = mesh.vertices;
 
+		Vector3 force = new Vector3(0, -9.8f, 0);
+
 		for(int i=0; i<X.Length; i++)
 		{
 			if(i==0 || i==20)	continue;
 			//Initial Setup
-			//...
+
+			V[i] += force * t;
+			X[i] += V[i] * t;
+			V[i] *= damping;
 		}
 		mesh.vertices = X;
 
-		for(int l=0; l<32; l++)
+		for(int l=0; l<16; l++)
 			Strain_Limiting ();
 
 		Collision_Handling ();
 
 		mesh.RecalculateNormals ();
-
 	}
-
-
 }
-
