@@ -25,7 +25,7 @@ public class Rigid_Bunny : MonoBehaviour
 		mesh = GetComponent<MeshFilter>().mesh;
 		vertices = mesh.vertices;
 
-		float m = 1.0f / vertices.Length;
+		float m = 1.0f;
 		mass=0;
 		for (int i=0; i<vertices.Length; i++) 
 		{
@@ -70,14 +70,17 @@ public class Rigid_Bunny : MonoBehaviour
 	{
 		Vector3 collisionVertex = Vector3.zero;
 		int collisionCount = 0;
+		Matrix4x4 R = GetRotationMatrix(transform.rotation);
+		Matrix4x4 model = transform.localToWorldMatrix;
 
 		foreach (Vector3 vet in vertices) {
 			Vector4 h = new Vector4(vet.x, vet.y, vet.z, 1);
-			Matrix4x4 model = transform.localToWorldMatrix;
 			Vector3 wv = model * h;
+			Vector3 rad = R * h;
+			Vector3 velocity = v + Vector3.Cross(w, rad);
 
 			float SDF = Vector3.Dot(wv - P, N.normalized);
-			if (SDF < 0) {
+			if (SDF < 0 && Vector3.Dot(velocity, N) < 0) {
 				collisionVertex += vet;
 				++collisionCount;
 			}
@@ -86,19 +89,14 @@ public class Rigid_Bunny : MonoBehaviour
 		if (collisionCount > 0) {
 			collisionVertex /= collisionCount;
 			Vector4 h = new Vector4(collisionVertex.x, collisionVertex.y, collisionVertex.z, 1);
-			Matrix4x4 R = GetRotationMatrix(transform.rotation);
 			Vector3 rad = R * h;
 			Vector3 velocity = v + Vector3.Cross(w, rad);
-
-			if (Vector3.Dot(velocity, N.normalized) >= 0) {
-				return;
-			}
 
 			Vector3 vn = Vector3.Dot(velocity, N.normalized) * N.normalized;
 			Vector3 vt = v - vn;
 
 			Vector3 nextVN = -restitution * vn;
-			float alpha = Mathf.Max(1 - 0.1f * (1 + restitution) * vn.magnitude / vt.magnitude, 0);
+			float alpha = Mathf.Max(1 - 0.9f * (1 + restitution) * vn.magnitude / vt.magnitude, 0);
 			Vector3 nextVT = alpha * vt;
 			Vector3 nextV = nextVN + nextVT;
 
@@ -112,7 +110,7 @@ public class Rigid_Bunny : MonoBehaviour
 				}
 			}
 
-			Vector4 deltaV = nextV - v;
+			Vector4 deltaV = nextV - velocity;
 			deltaV.w = 0;
 			Vector3 J = K.inverse * deltaV;
 
@@ -159,7 +157,7 @@ public class Rigid_Bunny : MonoBehaviour
 
 		// Part I: Update velocities
 		Vector3 force = new Vector3(0, -9.8f, 0);
-		v = v + dt * force / mass;
+		v = v + dt * force;
 		v *= linear_decay;
 		w *= angular_decay;
 
