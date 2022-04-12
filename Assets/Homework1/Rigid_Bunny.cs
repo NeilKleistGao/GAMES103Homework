@@ -78,7 +78,7 @@ public class Rigid_Bunny : MonoBehaviour
 
 			float SDF = Vector3.Dot(wv - P, N.normalized);
 			if (SDF < 0) {
-				collisionVertex += v;
+				collisionVertex += vet;
 				++collisionCount;
 			}
 		}
