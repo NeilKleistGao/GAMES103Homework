@@ -151,6 +151,34 @@ public class FVM : MonoBehaviour
 		return ret;
     }
 
+	// From TA's reference.
+	void Smooth_V()
+    {
+    	for(int i=0; i<number; i++)
+    	{
+    		V_sum[i]=new Vector3(0, 0, 0);
+    		V_num[i]=0;
+    	}
+
+    	for(int tet=0; tet<tet_number; tet++)
+    	{
+    		Vector3 sum=V[Tet[tet*4+0]]+V[Tet[tet*4+1]]+V[Tet[tet*4+2]]+V[Tet[tet*4+3]];
+    		V_sum[Tet[tet*4+0]]+=sum;
+    		V_sum[Tet[tet*4+1]]+=sum;
+    		V_sum[Tet[tet*4+2]]+=sum;
+    		V_sum[Tet[tet*4+3]]+=sum;
+			V_num[Tet[tet*4+0]]+=4;
+    		V_num[Tet[tet*4+1]]+=4;
+    		V_num[Tet[tet*4+2]]+=4;
+    		V_num[Tet[tet*4+3]]+=4;
+       	}
+
+       	for(int i=0; i<number; i++)
+       	{
+       		V[i]=0.9f*V[i]+0.1f*V_sum[i]/V_num[i];
+       	}
+    }
+
     void _Update()
     {
     	// Jump up.
@@ -209,7 +237,7 @@ public class FVM : MonoBehaviour
 			// Force[Tet[tet * 4]] = -(Force[Tet[tet * 4 + 1]] + Force[Tet[tet * 4 + 2]] + Force[Tet[tet * 4 + 3]]);
     	}
 
-		
+		Smooth_V();
     	for(int i=0; i<number; i++)
     	{
 			V[i] += Force[i] * dt;
