@@ -128,13 +128,25 @@ public class FVM : MonoBehaviour
         V_sum = new Vector3[number];
         V_num = new int[number];
 
-		//TODO: Need to allocate and assign inv_Dm
+		for (int i = 0; i < number; ++i) {
+			Force[i] = V[i] = Vector3.zero;
+		}
+
+		inv_Dm = new Matrix4x4[tet_number];
+		for (int i = 0; i < tet_number; ++i) {
+			inv_Dm[i] = Build_Edge_Matrix(i).inverse;
+		}
     }
 
     Matrix4x4 Build_Edge_Matrix(int tet)
     {
-    	Matrix4x4 ret=Matrix4x4.zero;
-    	//TODO: Need to build edge matrix here.
+    	Matrix4x4 ret=Matrix4x4.identity;
+    	Vector3 v0 = X[Tet[tet * 4]], v1 = X[Tet[tet * 4 + 1]], v2 = X[Tet[tet * 4 + 2]], v3 = X[Tet[tet * 4 + 3]];
+		Vector3 x10 = v1 - v0, x20 = v2 - v0, x30 = v3 - v0;
+
+		ret[0, 0] = x10.x; ret[1, 0] = x10.y; ret[2, 0] = x10.z;
+		ret[0, 1] = x20.x; ret[1, 1] = x20.y; ret[2, 1] = x20.z;
+		ret[0, 2] = x30.x; ret[1, 2] = x30.y; ret[2, 2] = x30.z;
 
 		return ret;
     }
@@ -149,28 +161,64 @@ public class FVM : MonoBehaviour
     			V[i].y+=0.2f;
     	}
 
-    	for(int i=0 ;i<number; i++)
+		Vector3 force = new Vector3(0, -9.8f, 0);
+    	for(int i=0; i<number; i++)
     	{
-    		//TODO: Add gravity to Force.
+    		Force[i] = new Vector3(0, -9.8f, 0);
     	}
 
     	for(int tet=0; tet<tet_number; tet++)
     	{
-    		//TODO: Deformation Gradient
-    		
-    		//TODO: Green Strain
+    		Matrix4x4 F = Build_Edge_Matrix(tet) * inv_Dm[tet];
+    		Matrix4x4 G = F.transpose * F;
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					G[i, j] -= (i == j) ? 1 : 0;
+					G[i, j] *= 0.5f;
+				}
+			}
 
-    		//TODO: Second PK Stress
+			float trace = 0.0f;
+			for (int i = 0; i < 3; ++i) {
+				trace += G[i, i];
+			}
 
-    		//TODO: Elastic Force
-			
+    		Matrix4x4 S = G;
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					S[i, j] *= stiffness_1 * 2;
+					if (i == j) {
+						S[i, j] += stiffness_0 * trace;
+					}
+				}
+			}
+
+			Matrix4x4 res = F * S * inv_Dm[tet].transpose;
+			float cof = -1.0f / (6.0f * inv_Dm[tet].determinant);
+
+			Force[Tet[tet * 4 + 1]].x += cof * res[0, 0];
+			Force[Tet[tet * 4 + 1]].y += cof * res[1, 0];
+			Force[Tet[tet * 4 + 1]].z += cof * res[2, 0];
+			Force[Tet[tet * 4 + 2]].x += cof * res[0, 1];
+			Force[Tet[tet * 4 + 2]].y += cof * res[1, 1];
+			Force[Tet[tet * 4 + 2]].z += cof * res[2, 1];
+			Force[Tet[tet * 4 + 3]].x += cof * res[0, 2];
+			Force[Tet[tet * 4 + 3]].y += cof * res[1, 2];
+			Force[Tet[tet * 4 + 3]].z += cof * res[2, 2];
+			Force[Tet[tet * 4]] = -(Force[Tet[tet * 4 + 1]] + Force[Tet[tet * 4 + 2]] + Force[Tet[tet * 4 + 3]]);
     	}
 
     	for(int i=0; i<number; i++)
     	{
-    		//TODO: Update X and V here.
-
-    		//TODO: (Particle) collision with floor.
+			V[i] += Force[i] * dt;
+			V[i] *= damp;
+    		X[i] += V[i] * dt;
+			
+    		if (X[i].y < -3) {
+				Vector3 res = new Vector3(X[i].x, -3, X[i].z);
+				V[i] += (res - X[i]) / dt;
+				X[i] = res;
+			}
     	}
     }
 
