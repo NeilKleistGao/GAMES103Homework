@@ -209,6 +209,7 @@ public class FVM : MonoBehaviour
 			// Force[Tet[tet * 4]] = -(Force[Tet[tet * 4 + 1]] + Force[Tet[tet * 4 + 2]] + Force[Tet[tet * 4 + 3]]);
     	}
 
+		
     	for(int i=0; i<number; i++)
     	{
 			V[i] += Force[i] * dt;
@@ -219,6 +220,7 @@ public class FVM : MonoBehaviour
     		if (X[i].y < -3) {
 				Vector3 res = new Vector3(X[i].x, -3, X[i].z);
 				V[i] += (res - X[i]) / dt;
+				V[i].x = V[i].z = 0;
 				X[i] = res;
 			}
     	}
