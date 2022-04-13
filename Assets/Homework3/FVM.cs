@@ -151,7 +151,6 @@ public class FVM : MonoBehaviour
 		return ret;
     }
 
-
     void _Update()
     {
     	// Jump up.
@@ -161,7 +160,6 @@ public class FVM : MonoBehaviour
     			V[i].y+=0.2f;
     	}
 
-		Vector3 force = new Vector3(0, -9.8f, 0);
     	for(int i=0; i<number; i++)
     	{
     		Force[i] = new Vector3(0, -9.8f, 0);
@@ -183,10 +181,10 @@ public class FVM : MonoBehaviour
 				trace += G[i, i];
 			}
 
-    		Matrix4x4 S = G;
+    		Matrix4x4 S = Matrix4x4.zero;
 			for (int i = 0; i < 3; ++i) {
 				for (int j = 0; j < 3; ++j) {
-					S[i, j] *= stiffness_1 * 2;
+					S[i, j] = stiffness_1 * 2 * G[i, j];
 					if (i == j) {
 						S[i, j] += stiffness_0 * trace;
 					}
@@ -196,6 +194,9 @@ public class FVM : MonoBehaviour
 			Matrix4x4 res = F * S * inv_Dm[tet].transpose;
 			float cof = -1.0f / (6.0f * inv_Dm[tet].determinant);
 
+			Force[Tet[tet * 4]].x -= cof * (res[0, 0] + res[0, 1] + res[0, 2]);
+			Force[Tet[tet * 4]].y -= cof * (res[1, 0] + res[1, 1] + res[1, 2]);
+			Force[Tet[tet * 4]].z -= cof * (res[2, 0] + res[2, 1] + res[2, 2]);
 			Force[Tet[tet * 4 + 1]].x += cof * res[0, 0];
 			Force[Tet[tet * 4 + 1]].y += cof * res[1, 0];
 			Force[Tet[tet * 4 + 1]].z += cof * res[2, 0];
@@ -205,7 +206,7 @@ public class FVM : MonoBehaviour
 			Force[Tet[tet * 4 + 3]].x += cof * res[0, 2];
 			Force[Tet[tet * 4 + 3]].y += cof * res[1, 2];
 			Force[Tet[tet * 4 + 3]].z += cof * res[2, 2];
-			Force[Tet[tet * 4]] = -(Force[Tet[tet * 4 + 1]] + Force[Tet[tet * 4 + 2]] + Force[Tet[tet * 4 + 3]]);
+			// Force[Tet[tet * 4]] = -(Force[Tet[tet * 4 + 1]] + Force[Tet[tet * 4 + 2]] + Force[Tet[tet * 4 + 3]]);
     	}
 
     	for(int i=0; i<number; i++)
@@ -213,6 +214,7 @@ public class FVM : MonoBehaviour
 			V[i] += Force[i] * dt;
 			V[i] *= damp;
     		X[i] += V[i] * dt;
+
 			
     		if (X[i].y < -3) {
 				Vector3 res = new Vector3(X[i].x, -3, X[i].z);
