@@ -34,7 +34,7 @@ public class FVM : MonoBehaviour
     	// FILO IO: Read the house model from files.
     	// The model is from Jonathan Schewchuk's Stellar lib.
     	{
-    		string fileContent = File.ReadAllText("Assets/house2.ele");
+    		string fileContent = File.ReadAllText("Assets/Homework3/house2.ele");
     		string[] Strings = fileContent.Split(new char[]{' ', '\t', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
     		
     		tet_number=int.Parse(Strings[0]);
@@ -49,7 +49,7 @@ public class FVM : MonoBehaviour
 			}
     	}
     	{
-			string fileContent = File.ReadAllText("Assets/house2.node");
+			string fileContent = File.ReadAllText("Assets/Homework3/house2.node");
     		string[] Strings = fileContent.Split(new char[]{' ', '\t', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
     		number = int.Parse(Strings[0]);
     		X = new Vector3[number];
