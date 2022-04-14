@@ -166,23 +166,18 @@ public class wave_motion : MonoBehaviour
 		}
 
 
-		// int li = size - 1, ui = 0, lj = size - 1, uj = 0; 
 		// Step 2: Block->Water coupling
 		// calculate low_h.
 		foreach (GameObject cube in cubes) {
 			Vector3 cubePos = cube.transform.position;
 			int li = Mathf.Max(0, Mathf.FloorToInt((cubePos.x + size * 0.05f) * 10.0f) - 3);
 			int ui = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.x + size * 0.05f) * 10.0f) + 3);
-			int lj = Mathf.Max(0, Mathf.FloorToInt((cubePos.y + size * 0.05f) * 10.0f) - 3);
-			int uj = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.y + size * 0.05f) * 10.0f) + 3);
-
-			// li = Mathf.Min(li, sli); ui = Mathf.Max(ui, sui);
-			// lj = Mathf.Min(lj, slj); uj = Mathf.Max(uj, suj);
+			int lj = Mathf.Max(0, Mathf.FloorToInt((cubePos.z + size * 0.05f) * 10.0f) - 3);
+			int uj = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.z + size * 0.05f) * 10.0f) + 3);
 
 			for (int i = li; i <= ui; ++i) {
 				for (int j = lj; j <= uj; ++j) {
-					low_h[i, j] = new_h[i, j];
-					Vector3 pos = new Vector3(i*0.1f-size*0.05f, 0, j*0.1f-size*0.05f);
+					Vector3 pos = new Vector3(i*0.1f-size*0.05f, -1, j*0.1f-size*0.05f);
 
 					Vector3 direction = (cube.transform.position - pos);
 					Ray ray = new Ray(pos, direction.normalized);
@@ -241,9 +236,6 @@ public class wave_motion : MonoBehaviour
 				h[i, j] = new_h[i, j];
 			}
 		}
-
-		//Step 4: Water->Block coupling.
-		//More TODO here.
 	}
 	
 
