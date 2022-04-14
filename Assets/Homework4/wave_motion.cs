@@ -23,6 +23,7 @@ public class wave_motion : MonoBehaviour
 
 	System.Random random = new System.Random();
 
+	[SerializeField] private GameObject[] cubes = null;
 
 	// Use this for initialization
 	void Start () 
@@ -164,18 +165,73 @@ public class wave_motion : MonoBehaviour
 			}
 		}
 
-		//Step 2: Block->Water coupling
-		//TODO: for block 1, calculate low_h.
-		//TODO: then set up b and cg_mask for conjugate gradient.
-		//TODO: Solve the Poisson equation to obtain vh (virtual height).
 
-		//TODO: for block 2, calculate low_h.
-		//TODO: then set up b and cg_mask for conjugate gradient.
-		//TODO: Solve the Poisson equation to obtain vh (virtual height).
-	
-		//TODO: Diminish vh.
+		// int li = size - 1, ui = 0, lj = size - 1, uj = 0; 
+		// Step 2: Block->Water coupling
+		// calculate low_h.
+		foreach (GameObject cube in cubes) {
+			Vector3 cubePos = cube.transform.position;
+			int li = Mathf.Max(0, Mathf.FloorToInt((cubePos.x + size * 0.05f) * 10.0f) - 3);
+			int ui = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.x + size * 0.05f) * 10.0f) + 3);
+			int lj = Mathf.Max(0, Mathf.FloorToInt((cubePos.y + size * 0.05f) * 10.0f) - 3);
+			int uj = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.y + size * 0.05f) * 10.0f) + 3);
 
-		//TODO: Update new_h by vh.
+			// li = Mathf.Min(li, sli); ui = Mathf.Max(ui, sui);
+			// lj = Mathf.Min(lj, slj); uj = Mathf.Max(uj, suj);
+
+			for (int i = li; i <= ui; ++i) {
+				for (int j = lj; j <= uj; ++j) {
+					low_h[i, j] = new_h[i, j];
+					Vector3 pos = new Vector3(i*0.1f-size*0.05f, 0, j*0.1f-size*0.05f);
+
+					Vector3 direction = (cube.transform.position - pos);
+					Ray ray = new Ray(pos, direction.normalized);
+					Vector3 temp = direction;
+					temp.y = 0;
+					float cosTheta = Vector3.Dot(direction.normalized, temp.normalized);
+					float maxDistance = 0.5f / cosTheta;
+
+					RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance);
+					foreach (RaycastHit hit in hits) {
+						low_h[i, j] = -hit.distance / maxDistance;
+					}
+				}
+			}
+
+			// then set up b and cg_mask for conjugate gradient.
+			for (int i = 0; i < size; ++i) {
+				for (int j = 0; j < size; ++j) {
+					if (low_h[i, j] < h[i, j]) {
+						cg_mask[i, j] = true;
+						b[i, j] = (new_h[i, j] - low_h[i, j]) / rate;
+					}
+					else {
+						cg_mask[i, j] = false;
+						b[i, j] = 0;
+						vh[i, j] = 0;
+					}
+				}
+			}
+			// Solve the Poisson equation to obtain vh (virtual height).
+			// Diminish vh.
+			Conjugate_Gradient(cg_mask, b, vh, li, ui, lj, uj);
+			for (int i = 0; i < size; ++i) {
+				for (int j = 0; j < size; ++j) {
+					vh[i, j] *= gamma;
+				}
+			}
+			// Update new_h by vh.
+			for (int i = 0; i < size; ++i) {
+				for (int j = 0; j < size; ++j) {
+					for (int k = 0; k < 4; ++k) {
+						int ni = i + next[k].x, nj = j + next[k].y;
+						if (ni > -1 && nj > -1 && ni < size && nj < size) {
+							new_h[i, j] += (vh[ni, nj] - vh[i, j]) * rate;
+						}
+					}
+				}
+			}
+		}
 
 		// Step 3
 		// old_h <- h; h <- new_h;
