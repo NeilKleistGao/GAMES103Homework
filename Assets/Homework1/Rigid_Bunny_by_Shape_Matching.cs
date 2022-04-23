@@ -155,6 +155,31 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 
 	void Collision(float inv_dt)
 	{
+		Vector3[] positions = new Vector3[2] {
+			new Vector3(0, 0.01f, 0),
+			new Vector3(2, 0, 0)
+		};
+
+		Vector3[] normals = new Vector3[2] {
+			new Vector3(0, 1, 0),
+			new Vector3(-1, 0, 0)
+		};
+
+		for (int i = 0; i < V.Length; ++i) {
+			Vector3 x = X[i];
+			for (int j = 0; j < positions.Length; ++j) {
+				Vector3 pos = positions[j];
+				Vector3 norm = normals[j];
+
+				float sdf = Vector3.Dot(x - pos, norm);
+				if (sdf < 0) {
+					x -= sdf * norm;
+					// V[i] += (x - X[i]) * inv_dt;
+					V[i] = -Vector3.Dot(V[i], norm) * norm * 0.5f;
+					X[i] = x;
+				}
+			}
+		}
 	}
 
     // Update is called once per frame
@@ -163,8 +188,12 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
   		float dt = 0.015f;
 
   		//Step 1: run a simple particle system.
+		Vector3 force = new Vector3(0, -9.8f, 0);
         for(int i=0; i<V.Length; i++)
         {
+			V[i] += force * dt;
+			// V[i] *= 0.99f;
+			X[i] += V[i] * dt;
         }
 
         //Step 2: Perform simple particle collision.
@@ -172,10 +201,35 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 
 		// Step 3: Use shape matching to get new translation c and 
 		// new rotation R. Update the mesh by c and R.
+		Vector3 c = Vector3.zero;
+		Matrix4x4 R = Matrix4x4.identity;
+
         //Shape Matching (translation)
+		for (int i = 0; i < V.Length; ++i) {
+			c += X[i];
+		}
+		c /= V.Length;
 		
 		//Shape Matching (rotation)
+		Matrix4x4 A = Matrix4x4.zero;
+		for (int i = 0; i < V.Length; ++i) {
+			Vector3 sub = X[i] - c;
+
+			A[0, 0] += sub.x * Q[i].x;
+			A[0, 1] += sub.x * Q[i].y;
+			A[0, 2] += sub.x * Q[i].z;
+			A[1, 0] += sub.y * Q[i].x;
+			A[1, 1] += sub.y * Q[i].y;
+			A[1, 2] += sub.y * Q[i].z;
+			A[2, 0] += sub.z * Q[i].x;
+			A[2, 1] += sub.z * Q[i].y;
+			A[2, 2] += sub.z * Q[i].z;
+		}
+
+		A[3, 3] = 1;
+		A *= QQt.inverse;
+		R = Get_Rotation(A);
 		
-		//Update_Mesh(c, R, 1/dt);
+		Update_Mesh(c, R, 1/dt);
     }
 }
