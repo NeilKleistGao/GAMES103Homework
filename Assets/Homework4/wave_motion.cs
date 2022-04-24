@@ -18,8 +18,8 @@ public class wave_motion : MonoBehaviour
 	float[,]	cg_Ap;
 	bool 	tag=true;
 
-	Vector3 	cube_v = Vector3.zero;
-	Vector3 	cube_w = Vector3.zero;
+	Vector3[] 	cube_v = new Vector3[2] { Vector3.zero, Vector3.zero };
+	Vector3[] 	cube_w = new Vector3[2] { Vector3.zero, Vector3.zero };
 
 	System.Random random = new System.Random();
 
@@ -154,6 +154,7 @@ public class wave_motion : MonoBehaviour
 		// Compute new_h based on the shallow wave model.
 		for (int i = 0; i < size; ++i) {
 			for (int j = 0; j < size; ++j) {
+				low_h[i, j] = h[i, j];
 				new_h[i, j] = h[i, j] + (h[i, j] - old_h[i, j]) * damping;
 				
 				for (int k = 0; k < 4; ++k) {
@@ -168,8 +169,13 @@ public class wave_motion : MonoBehaviour
 
 		// Step 2: Block->Water coupling
 		// calculate low_h.
+		int cubeIndex = 0;
 		foreach (GameObject cube in cubes) {
 			Vector3 cubePos = cube.transform.position;
+			if (cubePos.y >= 0.5f) {
+				continue;
+			}
+
 			int li = Mathf.Max(0, Mathf.FloorToInt((cubePos.x + size * 0.05f) * 10.0f) - 3);
 			int ui = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.x + size * 0.05f) * 10.0f) + 3);
 			int lj = Mathf.Max(0, Mathf.FloorToInt((cubePos.z + size * 0.05f) * 10.0f) - 3);
@@ -181,14 +187,10 @@ public class wave_motion : MonoBehaviour
 
 					Vector3 direction = (cube.transform.position - pos);
 					Ray ray = new Ray(pos, direction.normalized);
-					Vector3 temp = direction;
-					temp.y = 0;
-					float cosTheta = Vector3.Dot(direction.normalized, temp.normalized);
-					float maxDistance = 0.5f / cosTheta;
 
-					RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance);
+					RaycastHit[] hits = Physics.RaycastAll(ray, 1);
 					foreach (RaycastHit hit in hits) {
-						low_h[i, j] = -hit.distance / maxDistance;
+						low_h[i, j] = Mathf.Max(-1.0f/hit.distance, -5);
 					}
 				}
 			}
@@ -302,5 +304,55 @@ public class wave_motion : MonoBehaviour
 		
 		mesh.vertices = X;
 		mesh.RecalculateNormals();
+
+		{
+			GameObject cube = cubes[1];
+			Vector3 cubePos = cube.transform.position;
+			int li = Mathf.Max(0, Mathf.FloorToInt((cubePos.x + size * 0.05f) * 10.0f) - 3);
+			int ui = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.x + size * 0.05f) * 10.0f) + 3);
+			int lj = Mathf.Max(0, Mathf.FloorToInt((cubePos.z + size * 0.05f) * 10.0f) - 3);
+			int uj = Mathf.Min(size - 1, Mathf.CeilToInt((cubePos.z + size * 0.05f) * 10.0f) + 3);
+
+			Vector3 force = new Vector3(0, -9.8f, 0);
+			Vector3 torque = Vector3.zero;
+			if (cubePos.y < 0.5f) {
+				for (int i = li; i <= ui; ++i) {
+					for (int j = lj; j <= uj; ++j) {
+						if (vh[i,j] > 0) {
+							Vector3 f = new Vector3(0, 9.8f * vh[i,j] * 0.02f, 0);
+							force += f;
+
+							Vector3 pos = new Vector3(i*0.1f-size*0.05f, -1, j*0.1f-size*0.05f);
+
+							Vector3 direction = (cube.transform.position - pos);
+							Ray ray = new Ray(pos, direction.normalized);
+							RaycastHit[] hits = Physics.RaycastAll(ray, 1);
+							foreach (RaycastHit hit in hits) {
+								if (hit.transform == cube.transform) {
+									torque += Vector3.Cross(hit.point - cube.transform.position, f);
+								}
+							}
+						}
+					}
+				}
+			}
+
+			cube_v[1] += force * 0.004f;
+			cube_v[1] *= damping;
+			Vector3 res = cube.transform.position + cube_v[1] * 0.004f;
+			cube.transform.position = res;
+
+			cube_w[1] += torque * 0.004f * 1000;
+			cube_w[1] *= damping;
+			Quaternion q = cube.transform.rotation;
+			Quaternion deltaQ = new Quaternion();
+			deltaQ.w = 0;
+			deltaQ.x = 0.004f * 0.5f * cube_w[1].x;
+			deltaQ.y = 0.004f * 0.5f * cube_w[1].y;
+			deltaQ.z = 0.004f * 0.5f * cube_w[1].z;
+			deltaQ = deltaQ * q;
+			q.x += deltaQ.x; q.y += deltaQ.y; q.z += deltaQ.z; q.w += deltaQ.w;
+			cube.transform.rotation = q;
+		}
 	}
 }
