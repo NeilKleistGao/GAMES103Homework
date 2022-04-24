@@ -135,7 +135,18 @@ public class implicit_model : MonoBehaviour
 		Mesh mesh = GetComponent<MeshFilter> ().mesh;
 		Vector3[] X = mesh.vertices;
 		
-		//Handle colllision.
+		GameObject sphere = GameObject.Find("Sphere");
+		Vector3 center = sphere.transform.position;
+		float radius = 2.7f;
+
+		//For every vertex, detect collision and apply impulse if needed.
+		for (int i = 0; i < X.Length; ++i) {
+			if (Vector3.Distance(center, X[i]) < radius) {
+				Vector3 res = center + radius * (X[i] - center).normalized;
+				V[i] += (res - X[i]) / t;
+				X[i] = res;
+			}
+		}
 
 		mesh.vertices = X;
 	}
@@ -143,9 +154,23 @@ public class implicit_model : MonoBehaviour
 	void Get_Gradient(Vector3[] X, Vector3[] X_hat, float t, Vector3[] G)
 	{
 		//Momentum and Gravity.
+		Vector3 force = new Vector3(0, -9.8f, 0);
+		for (int i = 0; i < G.Length; ++i) {
+			if (i != 0 && i != 20) {
+				G[i] = (X[i] - X_hat[i]) / (t * t) - force;
+			}
+		}
 		
 		//Spring Force.
-		
+		for (int i = 0; i < E.Length / 2; ++i) {
+			if (i != 0 && i != 20) {
+				int v1 = E[i * 2], v2 = E[i * 2 + 1];
+				Vector3 sub = X[v1] - X[v2];
+				Vector3 delta = spring_k * sub * (1 - L[i] / Vector3.Magnitude(sub));
+				G[v1] += delta;
+				G[v2] -= delta;
+			}
+		}
 	}
 
     // Update is called once per frame
@@ -158,17 +183,40 @@ public class implicit_model : MonoBehaviour
 		Vector3[] G 		= new Vector3[X.Length];
 
 		//Initial Setup.
+		Vector3 force = new Vector3(0, -9.8f, 0);
+		for (int i = 0; i < X.Length; ++i) {
+			if (i != 0 && i != 20) {
+				V[i] += force * t;
+				V[i] *= damping;
+				X_hat[i] = X[i] + V[i] * t;
+				X[i] = X_hat[i];
+			}
+		}
+
+		Matrix4x4 H = Matrix4x4.identity;
+		H[0, 0] *= (1 / (t * t) + 4 * spring_k);
+		H[1, 1] *= (1 / (t * t) + 4 * spring_k);
+		H[2, 2] *= (1 / (t * t) + 4 * spring_k);
 
 		for(int k=0; k<32; k++)
 		{
 			Get_Gradient(X, X_hat, t, G);
 			
 			//Update X by gradient.
-			
+			for (int i = 0; i < G.Length; ++i) {
+				if (i != 0 && i != 20) {
+					Vector3 delta = H.inverse * G[i];
+					X[i] -= delta;
+				}
+			}
 		}
 
 		//Finishing.
-		
+		for (int i = 0; i < V.Length; ++i) {
+			if (i != 0 && i != 20) {
+				V[i] += (X[i] - X_hat[i]) / t;
+			}
+		}
 		mesh.vertices = X;
 
 		Collision_Handling ();
